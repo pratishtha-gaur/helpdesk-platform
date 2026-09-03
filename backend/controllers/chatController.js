@@ -1,6 +1,7 @@
 import ai, { MODEL_NAME } from "../config/gemini.js";
 import ChatLog from "../models/ChatLog.js";
 import { findBestFaqMatch } from "../utils/searchFaq.js";
+import { createTicketInternal } from "./ticketController.js";
 
 const ESCALATION_THRESHOLD = 0.15;
 
@@ -12,11 +13,9 @@ export async function handleChatMessage(req, res) {
       return res.status(400).json({ error: "Message text is required." });
     }
 
-    // ---- STEP 1: RETRIEVAL ----
     const { faq, score } = await findBestFaqMatch(message);
     const shouldEscalate = score < ESCALATION_THRESHOLD;
 
-    // ---- STEP 2: BUILD THE PROMPT ----
     const contextText = faq
       ? `Relevant college FAQ:\nQ: ${faq.question}\nA: ${faq.answer}`
       : "No matching FAQ was found in the knowledge base for this query.";
@@ -31,8 +30,8 @@ Rules you MUST follow:
 2. Reply to the student in THAT SAME language and script.
 3. Base your answer ONLY on the "Relevant college FAQ" context given below.
    If no relevant FAQ is provided, politely say you don't have that
-   information yet and suggest the student contact the college office —
-   do NOT make up facts, numbers, or dates.
+   information yet and that you're forwarding this to the college staff.
+   Do NOT make up facts, numbers, or dates.
 4. Keep the answer short, clear, and friendly (2-4 sentences).
 
 ${contextText}
@@ -44,18 +43,12 @@ no markdown code fences:
 {"language": "en", "answer": "your reply here"}
 `;
 
-    // ---- STEP 3: GENERATION ----
-    // New SDK syntax: ai.models.generateContent({ model, contents })
-    // instead of the old model.generateContent(prompt).
     const result = await ai.models.generateContent({
       model: MODEL_NAME,
       contents: prompt,
     });
 
-    // In the new SDK, the generated text is available directly as
-    // result.text (a property, not a function call like the old SDK).
     const rawText = result.text;
-
     const cleanedText = rawText.replace(/```json|```/g, "").trim();
 
     let parsed;
@@ -70,8 +63,8 @@ no markdown code fences:
       };
     }
 
-    // ---- STEP 4: LOG THE CONVERSATION ----
-    await ChatLog.create({
+    // ---- Save the chat log first, so we have an ID to link the ticket to ----
+    const chatLog = await ChatLog.create({
       sessionId: sessionId || "anonymous",
       studentQuery: message,
       detectedLanguage: parsed.language || "en",
@@ -81,11 +74,36 @@ no markdown code fences:
       wasEscalated: shouldEscalate,
     });
 
-    // ---- STEP 5: RESPOND TO THE FRONTEND ----
+    // ---- KEY NEW LOGIC: auto-create a real ticket on escalation ----
+    let ticketCode = null;
+    if (shouldEscalate) {
+      const ticket = await createTicketInternal({
+        category: faq ? faq.category : "General",
+        subject: message.slice(0, 80), // use the start of the message as a short subject
+        firstMessage: message,
+        sessionId: sessionId || "anonymous",
+        sourceChatLog: chatLog._id,
+        sender: "student",
+      });
+      // Also log the bot's auto-reply into the same thread, for context.
+      ticket.thread.push({ sender: "bot", text: parsed.answer });
+      await ticket.save();
+
+      ticketCode = ticket.ticketCode;
+    }
+
+    // If we escalated, make the reply mention the ticket ID so the student
+    // has something concrete to hold onto — this is what makes the platform
+    // feel reliable even when the AI itself doesn't know the answer.
+    const finalReply = ticketCode
+      ? `${parsed.answer}\n\nI've created ticket ${ticketCode} for you — you can track its status anytime on the "Track My Request" page.`
+      : parsed.answer;
+
     return res.status(200).json({
-      reply: parsed.answer,
+      reply: finalReply,
       language: parsed.language,
       escalated: shouldEscalate,
+      ticketCode,
     });
   } catch (error) {
     console.error("Chat controller error:", error.message);
