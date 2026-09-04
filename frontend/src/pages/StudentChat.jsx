@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { Link } from "react-router-dom";
+import Navbar from "../components/Navbar.jsx";
 
 const BACKEND_URL = "http://localhost:5050";
 const SESSION_ID = crypto.randomUUID();
@@ -56,62 +56,46 @@ function StudentChat() {
   }
 
   return (
-    <div className="chat-page">
-      <header className="chat-header">
-        <div>
-          <h1>MAIT Student Helpdesk</h1>
-          <p>Maharaja Agrasen Institute of Technology · GGSIPU</p>
-        </div>
-        <div className="header-links">
-          <Link to="/portal" className="admin-link">
-            Help Center
-          </Link>
-          <Link to="/track" className="admin-link">
-            Track My Request
-          </Link>
-          {/* Small link to the staff dashboard — in a real deployment this
-              would be a separate, login-protected URL, not linked publicly. */}
-          <Link to="/admin" className="admin-link">
-            Staff Login
-          </Link>
-        </div>
-      </header>
+    <div className="page">
+      <Navbar />
 
-      <div className="chat-window">
-        {messages.map((msg, index) => (
-          <div key={index} className={`message-row ${msg.sender}`}>
-            <div className={`message-bubble ${msg.sender}`}>
-              {msg.text}
-              {msg.escalated && (
-                <div className="escalated-tag">
-                  Not fully confident — a staff member may follow up.
-                </div>
-              )}
+      <div className="chat-shell">
+        <div className="chat-window">
+          {messages.map((msg, index) => (
+            <div key={index} className={`message-row ${msg.sender}`}>
+              <div className={`message-bubble ${msg.sender}`}>
+                {msg.text}
+                {msg.escalated && (
+                  <div className="escalated-tag">
+                    Not fully confident — a staff member may follow up.
+                  </div>
+                )}
+              </div>
             </div>
-          </div>
-        ))}
+          ))}
 
-        {isLoading && (
-          <div className="message-row bot">
-            <div className="message-bubble bot typing">Typing...</div>
-          </div>
-        )}
+          {isLoading && (
+            <div className="message-row bot">
+              <div className="message-bubble bot typing">Typing...</div>
+            </div>
+          )}
 
-        <div ref={bottomRef} />
-      </div>
+          <div ref={bottomRef} />
+        </div>
 
-      <div className="chat-input-area">
-        <input
-          type="text"
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          onKeyDown={handleKeyDown}
-          placeholder="Type your question in English, Hindi, or Punjabi..."
-          disabled={isLoading}
-        />
-        <button onClick={sendMessage} disabled={isLoading}>
-          Send
-        </button>
+        <div className="chat-input-area">
+          <input
+            type="text"
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            onKeyDown={handleKeyDown}
+            placeholder="Type your question in English, Hindi, or Punjabi..."
+            disabled={isLoading}
+          />
+          <button onClick={sendMessage} disabled={isLoading}>
+            Send
+          </button>
+        </div>
       </div>
     </div>
   );

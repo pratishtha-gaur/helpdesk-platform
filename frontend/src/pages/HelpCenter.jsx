@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
+import Navbar from "../components/Navbar.jsx";
 
 const BACKEND_URL = "http://localhost:5050";
 
@@ -48,23 +49,15 @@ function HelpCenter() {
   }
 
   return (
-    <div className="portal-page">
-      <header className="chat-header">
-        <div>
-          <h1>Help Center</h1>
-          <p>MAIT Student Helpdesk · Self-Service</p>
-        </div>
-        <div className="header-links">
-          <Link to="/" className="admin-link">
-            Chat Instead
-          </Link>
-          <Link to="/submit" className="admin-link">
-            Raise a Request
-          </Link>
-        </div>
-      </header>
+    <div className="page">
+      <Navbar />
 
-      <div className="portal-body">
+      <div className="portal-shell">
+        <div className="portal-intro">
+          <h1>Help Center</h1>
+          <p>Search or browse verified answers, organized by category.</p>
+        </div>
+
         <input
           type="text"
           className="portal-search"
@@ -91,7 +84,7 @@ function HelpCenter() {
           <div className="empty-state">
             <p>No matching FAQs found.</p>
             <Link to="/submit" className="inline-link">
-              Can't find your answer? Raise a request instead →
+              Can't find your answer? Raise a request instead
             </Link>
           </div>
         ) : (

@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
-import { Link, useSearchParams } from "react-router-dom";
+import { useSearchParams } from "react-router-dom";
+import Navbar from "../components/Navbar.jsx";
 
 const BACKEND_URL = "http://localhost:5050";
 
@@ -59,21 +60,14 @@ function TrackTicket() {
   }
 
   return (
-    <div className="track-page">
-      <header className="chat-header">
-        <div>
-          <h1>Track My Request</h1>
-          <p>MAIT Student Helpdesk</p>
-        </div>
-        <Link to="/" className="admin-link">
-          ← Back to Chat
-        </Link>
-      </header>
+    <div className="page">
+      <Navbar />
 
-      <div className="track-body">
-        <p className="track-instructions">
-          Enter the ticket code you received (e.g. <code>MAIT-0001</code>) to check its status.
-        </p>
+      <div className="track-shell">
+        <div className="portal-intro">
+          <h1>Track My Request</h1>
+          <p>Enter your ticket code to check its status.</p>
+        </div>
 
         <div className="track-search-row">
           <input

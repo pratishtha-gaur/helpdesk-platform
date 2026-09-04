@@ -1,4 +1,5 @@
 import { BrowserRouter, Routes, Route } from "react-router-dom";
+import Home from "./pages/Home.jsx";
 import StudentChat from "./pages/StudentChat.jsx";
 import AdminDashboard from "./pages/AdminDashboard.jsx";
 import TrackTicket from "./pages/TrackTicket.jsx";
@@ -10,7 +11,8 @@ function App() {
   return (
     <BrowserRouter>
       <Routes>
-        <Route path="/" element={<StudentChat />} />
+        <Route path="/" element={<Home />} />
+        <Route path="/chat" element={<StudentChat />} />
         <Route path="/portal" element={<HelpCenter />} />
         <Route path="/submit" element={<SubmitRequest />} />
         <Route path="/track" element={<TrackTicket />} />

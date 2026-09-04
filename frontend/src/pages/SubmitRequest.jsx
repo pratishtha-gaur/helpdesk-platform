@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
+import Navbar from "../components/Navbar.jsx";
 
 const BACKEND_URL = "http://localhost:5050";
 const CATEGORIES = ["Admissions", "Scholarships", "Examinations", "Fees", "Hostel", "General"];
@@ -43,18 +44,15 @@ function SubmitRequest() {
   }
 
   return (
-    <div className="track-page">
-      <header className="chat-header">
-        <div>
-          <h1>Raise a Request</h1>
-          <p>MAIT Student Helpdesk</p>
-        </div>
-        <Link to="/portal" className="admin-link">
-          ← Help Center
-        </Link>
-      </header>
+    <div className="page">
+      <Navbar />
 
-      <div className="track-body">
+      <div className="form-shell">
+        <div className="portal-intro">
+          <h1>Raise a Request</h1>
+          <p>Tell us what you need help with, and we'll get back to you.</p>
+        </div>
+
         <form onSubmit={handleSubmit} className="submit-form">
           <label>
             Category

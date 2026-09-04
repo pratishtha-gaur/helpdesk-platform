@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Link } from "react-router-dom";
+import Navbar from "../components/Navbar.jsx";
 import {
   BarChart,
   Bar,
@@ -15,8 +15,10 @@ import {
 
 const BACKEND_URL = "http://localhost:5050";
 
-// A palette for pie chart slices — recharts needs explicit colors.
-const COLORS = ["#1F3864", "#4472C4", "#8FAADC", "#B4C7E7", "#D9E2F3"];
+// Chart colors pulled from the same design tokens as the rest of the UI
+// (index.css :root), so the charts don't look like a mismatched, bolted-on
+// library default — they read as part of the same visual system.
+const COLORS = ["#1c2b4a", "#c1852e", "#2f6f63", "#35486b", "#f3e4c8"];
 
 function AdminDashboard() {
   // ---- STATE ----
@@ -72,20 +74,25 @@ function AdminDashboard() {
   }
 
   if (loading) {
-    return <div className="dashboard-page">Loading dashboard...</div>;
+    return (
+      <div className="page">
+        <Navbar />
+        <div className="dashboard-shell">
+          <p className="empty-state">Loading dashboard...</p>
+        </div>
+      </div>
+    );
   }
 
   return (
-    <div className="dashboard-page">
-      <header className="dashboard-header">
-        <div>
-          <h1>Staff Analytics Dashboard</h1>
-          <p>MAIT Student Helpdesk · Overview</p>
-        </div>
-        <Link to="/" className="admin-link">
-          ← Back to Chat
-        </Link>
-      </header>
+    <div className="page">
+      <Navbar />
+
+      <div className="dashboard-shell">
+      <div className="dashboard-intro">
+        <h1>Staff dashboard</h1>
+        <p>Usage overview and the support ticket queue.</p>
+      </div>
 
       {/* ---- SUMMARY CARDS ---- */}
       <div className="stats-cards">
@@ -135,7 +142,7 @@ function AdminDashboard() {
               <XAxis dataKey="_id" tick={{ fontSize: 11 }} />
               <YAxis allowDecimals={false} />
               <Tooltip />
-              <Bar dataKey="count" fill="#1F3864" radius={[4, 4, 0, 0]} />
+              <Bar dataKey="count" fill="#1c2b4a" radius={[4, 4, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
         </div>
@@ -207,6 +214,7 @@ function AdminDashboard() {
             ))}
           </div>
         )}
+      </div>
       </div>
     </div>
   );
