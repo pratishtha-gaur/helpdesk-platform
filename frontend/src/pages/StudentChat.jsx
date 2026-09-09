@@ -9,7 +9,7 @@ function StudentChat() {
   const [messages, setMessages] = useState([
     {
       sender: "bot",
-      text: "Hi! I'm the MAIT Student Helpdesk Assistant. Ask me about admissions, scholarships, exams, fees, or hostel — in English, Hindi, or Punjabi.",
+      text: "Hi! I'm the MAIT Student Helpdesk Assistant. Ask me about admissions, scholarships, exams, fees, or hostel — in the language you're most comfortable in.",
     },
   ]);
   const [input, setInput] = useState("");
@@ -44,9 +44,7 @@ function StudentChat() {
           sender: "bot",
           text: data.reply,
           escalated: data.escalated,
-          // NEW: keep the ticket code the backend already generated,
-          // so we can render a clickable link to it below.
-          ticketCode: data.ticketCode || null,
+          ticketCode: data.ticketCode,
         },
       ]);
     } catch (error) {
@@ -79,13 +77,23 @@ function StudentChat() {
                 {msg.escalated && (
                   <div className="escalated-tag">
                     Not fully confident — a staff member may follow up.
-                    {msg.ticketCode && (
-                      <Link
-                        to={`/track?code=${msg.ticketCode}`}
-                        className="ticket-link"
-                      >
-                        Track ticket {msg.ticketCode} →
-                      </Link>
+                    {msg.ticketCode ? (
+                      <>
+                        {" "}
+                        <Link
+                          to={`/track?code=${msg.ticketCode}`}
+                          className="inline-link"
+                        >
+                          Track ticket {msg.ticketCode}
+                        </Link>
+                      </>
+                    ) : (
+                      <>
+                        {" "}
+                        <Link to="/submit" className="inline-link">
+                          Raise a request instead
+                        </Link>
+                      </>
                     )}
                   </div>
                 )}
@@ -102,9 +110,8 @@ function StudentChat() {
           <div ref={bottomRef} />
         </div>
 
-        {/* NEW: always-visible escape hatch, in case the bot answers
-            but the student still isn't satisfied and no ticket was
-            auto-created. */}
+        {/* Always-visible escape hatch, in case the bot answers but the
+            student still isn't satisfied and no ticket was auto-created. */}
         <p className="chat-raise-request">
           Didn't get the answer you needed?{" "}
           <Link to="/submit">Raise a request</Link> and our staff will follow
@@ -117,7 +124,7 @@ function StudentChat() {
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="Type your question in English, Hindi, or Punjabi..."
+            placeholder="Type your question here..."
             disabled={isLoading}
           />
           <button onClick={sendMessage} disabled={isLoading}>

@@ -11,17 +11,17 @@ function Navbar() {
     { to: "/", label: "Home" },
     { to: "/chat", label: "Ask a Question" },
     { to: "/portal", label: "Help Center" },
-    { to: "/submit", label: "Raise a Request" },
     { to: "/track", label: "Track a Request" },
   ];
 
   return (
     <nav className="navbar">
       <Link to="/" className="navbar-brand">
-        <span className="navbar-mark">M</span>
+        {/* Place the crest file at frontend/public/mait-logo.png */}
+        <img src="/mait-logo.png" alt="MAIT crest" className="navbar-crest" />
         <span className="navbar-wordmark">
-          MAIT Helpdesk
-          <span className="navbar-subtext">GGSIPU</span>
+          MAIT Student Helpdesk
+          <span className="navbar-subtext">GGSIPU, ROHINI DELHI</span>
         </span>
       </Link>
 

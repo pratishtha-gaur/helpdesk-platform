@@ -1,19 +1,47 @@
 import { useState, useEffect } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import Navbar from "../components/Navbar.jsx";
 
 const BACKEND_URL = "http://localhost:5050";
 
-const CATEGORIES = ["All", "Admissions", "Scholarships", "Examinations", "Fees", "Hostel", "General"];
+const CATEGORIES = [
+  "All",
+  "Admissions",
+  "Scholarships",
+  "Examinations",
+  "Fees",
+  "Hostel",
+  "General",
+];
 
 function HelpCenter() {
+  // useSearchParams reads the "?category=..." part of the URL. Home's
+  // topic cards link here with a category already attached, e.g.
+  // "/portal?category=Hostel", so this page should open pre-filtered
+  // to that exact section instead of always starting on "All".
+  const [searchParams] = useSearchParams();
+
   const [faqs, setFaqs] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [activeCategory, setActiveCategory] = useState("All");
+  const [activeCategory, setActiveCategory] = useState(() => {
+    const fromUrl = searchParams.get("category");
+    return CATEGORIES.includes(fromUrl) ? fromUrl : "All";
+  });
   const [searchTerm, setSearchTerm] = useState("");
   // Tracks which FAQ's answer is currently expanded (accordion behavior) —
   // storing just the ID means only one (or none) is open at a time.
   const [expandedId, setExpandedId] = useState(null);
+
+  // If the URL's category changes after this page has already mounted
+  // (e.g. the student clicks another topic card while already on
+  // /portal), keep the active tab in sync with it.
+  useEffect(() => {
+    const fromUrl = searchParams.get("category");
+    if (CATEGORIES.includes(fromUrl) && fromUrl !== activeCategory) {
+      setActiveCategory(fromUrl);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
 
   // Re-fetch FAQs whenever the category or search term changes.
   // useEffect's dependency array [activeCategory, searchTerm] means:
@@ -26,9 +54,12 @@ function HelpCenter() {
         // "?category=Hostel&search=fee" from an object.
         const params = new URLSearchParams();
         if (activeCategory !== "All") params.append("category", activeCategory);
-        if (searchTerm.trim() !== "") params.append("search", searchTerm.trim());
+        if (searchTerm.trim() !== "")
+          params.append("search", searchTerm.trim());
 
-        const response = await fetch(`${BACKEND_URL}/api/faqs?${params.toString()}`);
+        const response = await fetch(
+          `${BACKEND_URL}/api/faqs?${params.toString()}`,
+        );
         const data = await response.json();
         setFaqs(data.faqs);
       } catch (error) {
@@ -91,11 +122,18 @@ function HelpCenter() {
           <div className="faq-accordion">
             {faqs.map((faq) => (
               <div key={faq._id} className="faq-item">
-                <button className="faq-question" onClick={() => toggleExpand(faq._id)}>
+                <button
+                  className="faq-question"
+                  onClick={() => toggleExpand(faq._id)}
+                >
                   <span>{faq.question}</span>
-                  <span className="faq-toggle-icon">{expandedId === faq._id ? "−" : "+"}</span>
+                  <span className="faq-toggle-icon">
+                    {expandedId === faq._id ? "−" : "+"}
+                  </span>
                 </button>
-                {expandedId === faq._id && <div className="faq-answer">{faq.answer}</div>}
+                {expandedId === faq._id && (
+                  <div className="faq-answer">{faq.answer}</div>
+                )}
               </div>
             ))}
           </div>
