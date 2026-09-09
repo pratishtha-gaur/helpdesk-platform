@@ -1,6 +1,7 @@
 import ai, { MODEL_NAME } from "../config/gemini.js";
 import ChatLog from "../models/ChatLog.js";
 import { findBestFaqMatch } from "../utils/searchFaq.js";
+import { findRelevantChunks } from "../utils/searchKnowledge.js";
 import { createTicketInternal } from "./ticketController.js";
 
 const ESCALATION_THRESHOLD = 0.15;
@@ -14,11 +15,25 @@ export async function handleChatMessage(req, res) {
     }
 
     const { faq, score } = await findBestFaqMatch(message);
-    const shouldEscalate = score < ESCALATION_THRESHOLD;
+    const relevantChunks = await findRelevantChunks(message);
 
-    const contextText = faq
-      ? `Relevant college FAQ:\nQ: ${faq.question}\nA: ${faq.answer}`
-      : "No matching FAQ was found in the knowledge base for this query.";
+    const contextParts = [];
+    if (faq) {
+      contextParts.push(`Verified FAQ:\nQ: ${faq.question}\nA: ${faq.answer}`);
+    }
+    relevantChunks.forEach((c) => {
+      const tag = [c.section, c.branch, c.semester ? `Sem ${c.semester}` : null]
+        .filter(Boolean)
+        .join(" - ");
+      contextParts.push(`[${tag}] (source: ${c.sourceUrl}):\n${c.text}`);
+    });
+
+    const contextText = contextParts.length
+      ? contextParts.join("\n\n")
+      : "No matching information was found in the knowledge base for this query.";
+
+    const hasGoodChunkMatch = relevantChunks.length > 0;
+    const shouldEscalate = score < ESCALATION_THRESHOLD && !hasGoodChunkMatch;
 
     const prompt = `
 You are a helpful, polite student helpdesk assistant for Maharaja Agrasen
@@ -28,12 +43,14 @@ Rules you MUST follow:
 1. Detect the language the student wrote their message in (respond with
    its ISO code, e.g. "en" for English, "hi" for Hindi, "pa" for Punjabi).
 2. Reply to the student in THAT SAME language and script.
-3. Base your answer ONLY on the "Relevant college FAQ" context given below.
-   If no relevant FAQ is provided, politely say you don't have that
-   information yet and that you're forwarding this to the college staff.
-   Do NOT make up facts, numbers, or dates.
+3. Base your answer ONLY on the context given below (verified FAQ +
+   information scraped from the MAIT website). If nothing relevant is
+   provided, politely say you don't have that information yet and that
+   you're forwarding this to the college staff. Do NOT make up facts,
+   numbers, dates, or fee amounts.
 4. Keep the answer short, clear, and friendly (2-4 sentences).
 
+Context:
 ${contextText}
 
 Student's message: "${message}"
@@ -58,12 +75,10 @@ no markdown code fences:
       console.error("Failed to parse Gemini response:", rawText);
       parsed = {
         language: "en",
-        answer:
-          "Sorry, I had trouble understanding that. Could you please rephrase your question?",
+        answer: "Sorry, I had trouble understanding that. Could you please rephrase your question?",
       };
     }
 
-    // ---- Save the chat log first, so we have an ID to link the ticket to ----
     const chatLog = await ChatLog.create({
       sessionId: sessionId || "anonymous",
       studentQuery: message,
@@ -74,27 +89,21 @@ no markdown code fences:
       wasEscalated: shouldEscalate,
     });
 
-    // ---- KEY NEW LOGIC: auto-create a real ticket on escalation ----
     let ticketCode = null;
     if (shouldEscalate) {
       const ticket = await createTicketInternal({
         category: faq ? faq.category : "General",
-        subject: message.slice(0, 80), // use the start of the message as a short subject
+        subject: message.slice(0, 80),
         firstMessage: message,
         sessionId: sessionId || "anonymous",
         sourceChatLog: chatLog._id,
         sender: "student",
       });
-      // Also log the bot's auto-reply into the same thread, for context.
       ticket.thread.push({ sender: "bot", text: parsed.answer });
       await ticket.save();
-
       ticketCode = ticket.ticketCode;
     }
 
-    // If we escalated, make the reply mention the ticket ID so the student
-    // has something concrete to hold onto — this is what makes the platform
-    // feel reliable even when the AI itself doesn't know the answer.
     const finalReply = ticketCode
       ? `${parsed.answer}\n\nI've created ticket ${ticketCode} for you — you can track its status anytime on the "Track My Request" page.`
       : parsed.answer;
