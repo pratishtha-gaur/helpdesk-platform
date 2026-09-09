@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from "react";
+import { Link } from "react-router-dom";
 import Navbar from "../components/Navbar.jsx";
 
 const BACKEND_URL = "http://localhost:5050";
@@ -39,12 +40,22 @@ function StudentChat() {
       const data = await response.json();
       setMessages((prev) => [
         ...prev,
-        { sender: "bot", text: data.reply, escalated: data.escalated },
+        {
+          sender: "bot",
+          text: data.reply,
+          escalated: data.escalated,
+          // NEW: keep the ticket code the backend already generated,
+          // so we can render a clickable link to it below.
+          ticketCode: data.ticketCode || null,
+        },
       ]);
     } catch (error) {
       setMessages((prev) => [
         ...prev,
-        { sender: "bot", text: "Sorry, I couldn't connect to the server. Please try again." },
+        {
+          sender: "bot",
+          text: "Sorry, I couldn't connect to the server. Please try again.",
+        },
       ]);
     } finally {
       setIsLoading(false);
@@ -68,6 +79,14 @@ function StudentChat() {
                 {msg.escalated && (
                   <div className="escalated-tag">
                     Not fully confident — a staff member may follow up.
+                    {msg.ticketCode && (
+                      <Link
+                        to={`/track?code=${msg.ticketCode}`}
+                        className="ticket-link"
+                      >
+                        Track ticket {msg.ticketCode} →
+                      </Link>
+                    )}
                   </div>
                 )}
               </div>
@@ -82,6 +101,15 @@ function StudentChat() {
 
           <div ref={bottomRef} />
         </div>
+
+        {/* NEW: always-visible escape hatch, in case the bot answers
+            but the student still isn't satisfied and no ticket was
+            auto-created. */}
+        <p className="chat-raise-request">
+          Didn't get the answer you needed?{" "}
+          <Link to="/submit">Raise a request</Link> and our staff will follow
+          up.
+        </p>
 
         <div className="chat-input-area">
           <input

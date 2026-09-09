@@ -11,6 +11,7 @@ function Navbar() {
     { to: "/", label: "Home" },
     { to: "/chat", label: "Ask a Question" },
     { to: "/portal", label: "Help Center" },
+    { to: "/submit", label: "Raise a Request" },
     { to: "/track", label: "Track a Request" },
   ];
 

@@ -410,6 +410,37 @@ a {
   color: var(--gold-700);
 }
 
+.ticket-link {
+  display: inline-block;
+  margin-top: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--gold-700);
+  border-bottom: 1px solid var(--gold-700);
+}
+
+.ticket-link:hover {
+  color: var(--navy-900);
+  border-bottom-color: var(--navy-900);
+}
+
+.chat-raise-request {
+  text-align: center;
+  font-size: 13px;
+  color: var(--text-secondary);
+  padding-top: 12px;
+}
+
+.chat-raise-request a {
+  color: var(--navy-800);
+  font-weight: 500;
+  border-bottom: 1px solid var(--border-strong);
+}
+
+.chat-raise-request a:hover {
+  border-bottom-color: var(--navy-800);
+}
+
 .chat-input-area {
   display: flex;
   gap: 10px;
