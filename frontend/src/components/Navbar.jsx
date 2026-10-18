@@ -1,4 +1,5 @@
 import { Link, useLocation } from "react-router-dom";
+import { getToken } from "../utils/auth.js";
 
 // A single shared navigation bar, used on every page, so navigation feels
 // consistent instead of every page inventing its own header.
@@ -6,6 +7,8 @@ function Navbar() {
   // useLocation tells us the current URL, so we can highlight
   // whichever nav link matches where the student currently is.
   const location = useLocation();
+
+  const loggedIn = !!getToken();
 
   const links = [
     { to: "/", label: "Home" },
@@ -37,8 +40,8 @@ function Navbar() {
         ))}
       </div>
 
-      <Link to="/admin" className="navbar-staff">
-        Staff Login
+      <Link to={loggedIn ? "/admin" : "/staff-login"} className="navbar-staff">
+        {loggedIn ? "Staff Dashboard" : "Staff Login"}
       </Link>
     </nav>
   );

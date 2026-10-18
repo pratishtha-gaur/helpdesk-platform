@@ -4,12 +4,13 @@ import {
   getEscalatedQueries,
   resolveEscalation,
 } from "../controllers/analyticsController.js";
+import { requireStaff } from "../middleware/authMiddleware.js";
 
 const router = express.Router();
 
-// GET  /api/analytics/summary            -> dashboard stats + charts
-// GET  /api/analytics/escalated          -> list of escalated queries
-// PATCH /api/analytics/escalated/:id/resolve -> mark one as resolved
+// Everything below this line requires a logged-in staff member.
+router.use(requireStaff);
+
 router.get("/summary", getSummary);
 router.get("/escalated", getEscalatedQueries);
 router.patch("/escalated/:id/resolve", resolveEscalation);

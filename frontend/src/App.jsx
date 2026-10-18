@@ -6,6 +6,8 @@ import TrackTicket from "./pages/TrackTicket.jsx";
 import HelpCenter from "./pages/HelpCenter.jsx";
 import SubmitRequest from "./pages/SubmitRequest.jsx";
 import "./index.css";
+import StaffLogin from "./pages/StaffLogin.jsx";
+import ProtectedRoute from "./components/ProtectedRoute.jsx";
 
 function App() {
   return (
@@ -16,7 +18,15 @@ function App() {
         <Route path="/portal" element={<HelpCenter />} />
         <Route path="/submit" element={<SubmitRequest />} />
         <Route path="/track" element={<TrackTicket />} />
-        <Route path="/admin" element={<AdminDashboard />} />
+        <Route path="/staff-login" element={<StaffLogin />} />
+        <Route
+          path="/admin"
+          element={
+            <ProtectedRoute>
+              <AdminDashboard />
+            </ProtectedRoute>
+          }
+        />
       </Routes>
     </BrowserRouter>
   );
