@@ -7,6 +7,7 @@ import analyticsRoutes from "./routes/analyticsRoutes.js";
 import ticketRoutes from "./routes/ticketRoutes.js";
 import faqRoutes from "./routes/faqRoutes.js";
 import authRoutes from "./routes/authRoutes.js";
+import { loadChunkCache } from "./utils/chunkCache.js";
 
 dotenv.config();
 
@@ -16,7 +17,7 @@ if (!process.env.JWT_SECRET) {
   process.exit(1);
 }
 
-connectDB();
+connectDB().then(() => loadChunkCache());
 
 const app = express();
 

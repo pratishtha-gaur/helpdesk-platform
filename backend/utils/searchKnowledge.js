@@ -1,17 +1,27 @@
-
-import KnowledgeChunk from "../models/KnowledgeChunk.js";
 import { embedText } from "../config/embeddings.js";
+import { loadChunkCache } from "./chunkCache.js";
 
-export async function findRelevantChunks(query, topK = 5) {
-  const queryEmbedding = await embedText(query);
-  const allChunks = await KnowledgeChunk.find({}, "text section branch semester sourceUrl embedding");
+export async function findRelevantChunks(query, topK = 3) {
+  // Run the embedding API call and the cache load at the same time
+  const [queryEmbedding, chunks] = await Promise.all([
+    embedText(query),
+    loadChunkCache(),
+  ]);
 
-  if (allChunks.length === 0) return [];
+  if (chunks.length === 0) return [];
 
-  const scored = allChunks.map((chunk) => ({
-    chunk,
-    score: KnowledgeChunk.cosineSimilarity(queryEmbedding, chunk.embedding),
-  }));
+  // Normalize the query vector
+  const q = Float32Array.from(queryEmbedding);
+  let sum = 0;
+  for (let i = 0; i < q.length; i++) sum += q[i] * q[i];
+  const norm = Math.sqrt(sum) || 1;
+  for (let i = 0; i < q.length; i++) q[i] /= norm;
+
+  const scored = chunks.map((chunk) => {
+    let dot = 0;
+    for (let i = 0; i < q.length; i++) dot += q[i] * chunk.vec[i];
+    return { chunk, score: dot };
+  });
 
   scored.sort((a, b) => b.score - a.score);
   return scored.slice(0, topK).map((s) => s.chunk);

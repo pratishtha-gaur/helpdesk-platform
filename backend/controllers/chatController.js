@@ -14,8 +14,14 @@ export async function handleChatMessage(req, res) {
       return res.status(400).json({ error: "Message text is required." });
     }
 
-    const { faq, score } = await findBestFaqMatch(message);
-    const relevantChunks = await findRelevantChunks(message);
+    console.time("total"); // CHANGED: timing, remove later
+
+    // CHANGED: run both searches at the same time, and use only 3 chunks
+    const [{ faq, score }, relevantChunks] = await Promise.all([
+      findBestFaqMatch(message),
+      findRelevantChunks(message, 3),
+    ]);
+    console.timeLog("total", "- search done");
 
     const contextParts = [];
     if (faq) {
@@ -25,7 +31,10 @@ export async function handleChatMessage(req, res) {
       const tag = [c.section, c.branch, c.semester ? `Sem ${c.semester}` : null]
         .filter(Boolean)
         .join(" - ");
-      contextParts.push(`[${tag}] (source: ${c.sourceUrl}):\n${c.text}`);
+      // CHANGED: trim each chunk so the prompt stays short
+      contextParts.push(
+        `[${tag}] (source: ${c.sourceUrl}):\n${c.text.slice(0, 800)}`,
+      );
     });
 
     const contextText = contextParts.length
@@ -55,15 +64,22 @@ ${contextText}
 
 Student's message: "${message}"
 
-Respond ONLY with valid JSON in exactly this format, nothing else,
-no markdown code fences:
+Respond ONLY with valid JSON in exactly this format:
 {"language": "en", "answer": "your reply here"}
 `;
 
+    // CHANGED: ask for JSON directly, cap the length, reduce "thinking"
     const result = await ai.models.generateContent({
       model: MODEL_NAME,
       contents: prompt,
+      config: {
+        responseMimeType: "application/json",
+        maxOutputTokens: 500,
+        temperature: 0.3,
+        thinkingConfig: { thinkingBudget: 0 },
+      },
     });
+    console.timeLog("total", "- gemini done");
 
     const rawText = result.text;
     const cleanedText = rawText.replace(/```json|```/g, "").trim();
@@ -75,11 +91,12 @@ no markdown code fences:
       console.error("Failed to parse Gemini response:", rawText);
       parsed = {
         language: "en",
-        answer: "Sorry, I had trouble understanding that. Could you please rephrase your question?",
+        answer:
+          "Sorry, I had trouble understanding that. Could you please rephrase your question?",
       };
     }
 
-    const chatLog = await ChatLog.create({
+    const logData = {
       sessionId: sessionId || "anonymous",
       studentQuery: message,
       detectedLanguage: parsed.language || "en",
@@ -87,10 +104,13 @@ no markdown code fences:
       botResponse: parsed.answer,
       confidenceScore: score,
       wasEscalated: shouldEscalate,
-    });
+    };
 
     let ticketCode = null;
+
     if (shouldEscalate) {
+      // Ticket needs the chat log's ID, so we must wait here
+      const chatLog = await ChatLog.create(logData);
       const ticket = await createTicketInternal({
         category: faq ? faq.category : "General",
         subject: message.slice(0, 80),
@@ -102,11 +122,18 @@ no markdown code fences:
       ticket.thread.push({ sender: "bot", text: parsed.answer });
       await ticket.save();
       ticketCode = ticket.ticketCode;
+    } else {
+      // CHANGED: save the log in the background, don't make the student wait
+      ChatLog.create(logData).catch((err) =>
+        console.error("ChatLog save failed:", err.message),
+      );
     }
 
     const finalReply = ticketCode
       ? `${parsed.answer}\n\nI've created ticket ${ticketCode} for you — you can track its status anytime on the "Track My Request" page.`
       : parsed.answer;
+
+    console.timeEnd("total");
 
     return res.status(200).json({
       reply: finalReply,
@@ -116,6 +143,8 @@ no markdown code fences:
     });
   } catch (error) {
     console.error("Chat controller error:", error.message);
-    return res.status(500).json({ error: "Something went wrong. Please try again." });
+    return res
+      .status(500)
+      .json({ error: "Something went wrong. Please try again." });
   }
 }
