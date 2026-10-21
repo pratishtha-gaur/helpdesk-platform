@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useNavigate, useLocation, Navigate } from "react-router-dom";
+import { useNavigate, useLocation, Navigate, Link } from "react-router-dom";
 import Navbar from "../components/Navbar.jsx";
 import { saveAuth, getToken } from "../utils/auth.js";
 
@@ -21,7 +21,7 @@ function StaffLogin() {
   async function handleSubmit(e) {
     e.preventDefault();
     if (!email.trim() || !password) {
-      setError("Please enter your email and password.");
+      setError("Please enter both your university email and password.");
       return;
     }
 
@@ -37,62 +37,112 @@ function StaffLogin() {
       const data = await response.json();
 
       if (!response.ok) {
-        setError(data.error || "Login failed.");
+        setError(data.error || "Login credentials could not be verified.");
         return;
       }
 
       saveAuth(data.token, data.staff);
       navigate(redirectTo, { replace: true });
     } catch {
-      setError("Could not reach the server. Please try again.");
+      setError("Could not establish connection to the MAIT authentication service.");
     } finally {
       setSubmitting(false);
     }
   }
 
   return (
-    <div className="page">
+    <div className="page login-page-wrapper">
       <Navbar />
-      <div className="form-shell">
-        <div className="portal-intro">
-          <h1>Staff Login</h1>
-          <p>
-            Authorised MAIT staff only. Use the account provided by the
-            administrator.
-          </p>
+
+      <main className="login-shell">
+        <div className="login-card-container">
+          {/* Card Top Brand */}
+          <div className="login-header-section">
+            <div className="login-crest-wrapper">
+              <img src="/mait-logo.png" alt="MAIT Crest" className="login-crest-img" />
+            </div>
+            <div className="login-badge">
+              <span className="lock-icon">🔒</span>
+              <span>Authorized Faculty &amp; Staff Only</span>
+            </div>
+            <h1>Staff Management Portal</h1>
+            <p>
+              Sign in with your official university credentials to manage tickets and view helpdesk analytics.
+            </p>
+          </div>
+
+          <form onSubmit={handleSubmit} className="login-form-box">
+            <div className="form-field-group">
+              <label htmlFor="staff-email">
+                <span className="field-label-text">Institutional Email</span>
+              </label>
+              <div className="input-with-icon">
+                <span className="input-icon">✉️</span>
+                <input
+                  id="staff-email"
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  autoComplete="username"
+                  placeholder="faculty@mait.ac.in"
+                  required
+                />
+              </div>
+            </div>
+
+            <div className="form-field-group">
+              <label htmlFor="staff-password">
+                <span className="field-label-text">Password</span>
+              </label>
+              <div className="input-with-icon">
+                <span className="input-icon">🔑</span>
+                <input
+                  id="staff-password"
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  autoComplete="current-password"
+                  placeholder="••••••••••••"
+                  required
+                />
+              </div>
+            </div>
+
+            {error && (
+              <div className="form-error-alert">
+                <span className="error-icon">⚠️</span>
+                <span>{error}</span>
+              </div>
+            )}
+
+            <button type="submit" className="login-submit-btn" disabled={submitting}>
+              {submitting ? (
+                <span className="btn-loading-state">
+                  <span className="btn-spinner" />
+                  <span>Signing In…</span>
+                </span>
+              ) : (
+                <>
+                  <span>Sign In to Dashboard</span>
+                  <span className="arrow-icon">→</span>
+                </>
+              )}
+            </button>
+          </form>
+
+          <div className="login-footer-note">
+            <p>
+              Are you a student seeking assistance?{" "}
+              <Link to="/chat" className="login-student-link">
+                Go to Student Assistant →
+              </Link>
+            </p>
+          </div>
         </div>
-
-        <form onSubmit={handleSubmit} className="submit-form">
-          <label>
-            Email
-            <input
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              autoComplete="username"
-              placeholder="name@mait.ac.in"
-            />
-          </label>
-
-          <label>
-            Password
-            <input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              autoComplete="current-password"
-            />
-          </label>
-
-          {error && <p className="track-error">{error}</p>}
-
-          <button type="submit" className="submit-btn" disabled={submitting}>
-            {submitting ? "Signing in..." : "Sign in"}
-          </button>
-        </form>
-      </div>
+      </main>
     </div>
   );
 }
 
 export default StaffLogin;
+

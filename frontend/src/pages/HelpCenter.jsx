@@ -4,22 +4,20 @@ import Navbar from "../components/Navbar.jsx";
 
 const BACKEND_URL = "http://localhost:5050";
 
-const CATEGORIES = [
-  "All",
-  "Admissions",
-  "Scholarships",
-  "Examinations",
-  "Fees",
-  "Hostel",
-  "General",
+const CATEGORY_ITEMS = [
+  { name: "All", icon: "🌐" },
+  { name: "Admissions", icon: "🎓" },
+  { name: "Scholarships", icon: "🎗️" },
+  { name: "Examinations", icon: "📝" },
+  { name: "Fees", icon: "💳" },
+  { name: "Hostel", icon: "🏠" },
+  { name: "General", icon: "🏛️" },
 ];
 
+const CATEGORIES = CATEGORY_ITEMS.map((c) => c.name);
+
 function HelpCenter() {
-  // useSearchParams reads the "?category=..." part of the URL. Home's
-  // topic cards link here with a category already attached, e.g.
-  // "/portal?category=Hostel", so this page should open pre-filtered
-  // to that exact section instead of always starting on "All".
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
 
   const [faqs, setFaqs] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -28,40 +26,26 @@ function HelpCenter() {
     return CATEGORIES.includes(fromUrl) ? fromUrl : "All";
   });
   const [searchTerm, setSearchTerm] = useState("");
-  // Tracks which FAQ's answer is currently expanded (accordion behavior) —
-  // storing just the ID means only one (or none) is open at a time.
   const [expandedId, setExpandedId] = useState(null);
 
-  // If the URL's category changes after this page has already mounted
-  // (e.g. the student clicks another topic card while already on
-  // /portal), keep the active tab in sync with it.
   useEffect(() => {
     const fromUrl = searchParams.get("category");
     if (CATEGORIES.includes(fromUrl) && fromUrl !== activeCategory) {
       setActiveCategory(fromUrl);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams]);
 
-  // Re-fetch FAQs whenever the category or search term changes.
-  // useEffect's dependency array [activeCategory, searchTerm] means:
-  // "re-run this function whenever either of these values changes."
   useEffect(() => {
     async function fetchFaqs() {
       setLoading(true);
       try {
-        // URLSearchParams safely builds a query string like
-        // "?category=Hostel&search=fee" from an object.
         const params = new URLSearchParams();
         if (activeCategory !== "All") params.append("category", activeCategory);
-        if (searchTerm.trim() !== "")
-          params.append("search", searchTerm.trim());
+        if (searchTerm.trim() !== "") params.append("search", searchTerm.trim());
 
-        const response = await fetch(
-          `${BACKEND_URL}/api/faqs?${params.toString()}`,
-        );
+        const response = await fetch(`${BACKEND_URL}/api/faqs?${params.toString()}`);
         const data = await response.json();
-        setFaqs(data.faqs);
+        setFaqs(data.faqs || []);
       } catch (error) {
         console.error("Failed to load FAQs:", error);
       } finally {
@@ -69,78 +53,158 @@ function HelpCenter() {
       }
     }
 
-    // A small debounce: wait 300ms after the user stops typing before
-    // actually searching, so we don't fire a request on every keystroke.
     const timeoutId = setTimeout(fetchFaqs, 300);
-    return () => clearTimeout(timeoutId); // cancel the previous timer if still typing
+    return () => clearTimeout(timeoutId);
   }, [activeCategory, searchTerm]);
+
+  function handleCategorySelect(cat) {
+    setActiveCategory(cat);
+    if (cat === "All") {
+      setSearchParams({});
+    } else {
+      setSearchParams({ category: cat });
+    }
+  }
 
   function toggleExpand(id) {
     setExpandedId((prev) => (prev === id ? null : id));
   }
 
   return (
-    <div className="page">
+    <div className="page portal-page-wrapper">
       <Navbar />
 
-      <div className="portal-shell">
+      <main className="portal-shell">
+        {/* Knowledge Base Header */}
         <div className="portal-intro">
-          <h1>Help Center</h1>
-          <p>Search or browse verified answers, organized by category.</p>
+          <div className="section-badge-wrapper center-badge">
+            <span className="section-badge">OFFICIAL REPOSITORY</span>
+            <h1>Help Center &amp; Knowledge Base</h1>
+            <p>
+              Verified guidelines, college circulars, and frequently asked questions for MAIT students.
+            </p>
+          </div>
         </div>
 
-        <input
-          type="text"
-          className="portal-search"
-          placeholder="Search for a topic, e.g. hostel fee, scholarship..."
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-        />
-
-        <div className="category-chips">
-          {CATEGORIES.map((cat) => (
+        {/* Search Bar */}
+        <div className="portal-search-box">
+          <span className="search-box-icon">🔍</span>
+          <input
+            type="text"
+            className="portal-search-input"
+            placeholder="Search FAQs (e.g., 'hostel refund', '75% attendance', 'scholarship portal')..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            aria-label="Search FAQs"
+          />
+          {searchTerm && (
             <button
-              key={cat}
-              className={`chip ${activeCategory === cat ? "active" : ""}`}
-              onClick={() => setActiveCategory(cat)}
+              type="button"
+              className="search-clear-btn"
+              onClick={() => setSearchTerm("")}
+              title="Clear search"
             >
-              {cat}
+              ✕
             </button>
-          ))}
+          )}
         </div>
 
+        {/* Category Filter Chips */}
+        <div className="category-chips" role="tablist" aria-label="FAQ Categories">
+          {CATEGORY_ITEMS.map((cat) => {
+            const isActive = activeCategory === cat.name;
+            return (
+              <button
+                key={cat.name}
+                type="button"
+                role="tab"
+                aria-selected={isActive}
+                className={`chip ${isActive ? "active" : ""}`}
+                onClick={() => handleCategorySelect(cat.name)}
+              >
+                <span className="chip-icon">{cat.icon}</span>
+                <span>{cat.name}</span>
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Results Info Bar */}
+        <div className="faq-results-bar">
+          <span className="results-count">
+            {loading ? "Searching knowledge base…" : `${faqs.length} verified answers found`}
+          </span>
+          {searchTerm && (
+            <span className="search-filter-tag">
+              Filtered by: <strong>"{searchTerm}"</strong>
+            </span>
+          )}
+        </div>
+
+        {/* Content Section */}
         {loading ? (
-          <p className="empty-state">Loading...</p>
+          <div className="faq-loading-skeleton">
+            <div className="skeleton-bar" />
+            <div className="skeleton-bar" />
+            <div className="skeleton-bar" />
+          </div>
         ) : faqs.length === 0 ? (
           <div className="empty-state">
-            <p>No matching FAQs found.</p>
-            <Link to="/submit" className="inline-link">
-              Can't find your answer? Raise a request instead
-            </Link>
+            <div className="empty-state-icon">📋</div>
+            <h3>No matching answers found</h3>
+            <p>We couldn't find an exact match for your search in this category.</p>
+            <div className="empty-state-actions">
+              <Link to="/chat" className="btn btn-primary">
+                Ask AI Assistant
+              </Link>
+              <Link to="/submit" className="btn btn-secondary">
+                Raise an Official Request
+              </Link>
+            </div>
           </div>
         ) : (
           <div className="faq-accordion">
-            {faqs.map((faq) => (
-              <div key={faq._id} className="faq-item">
-                <button
-                  className="faq-question"
-                  onClick={() => toggleExpand(faq._id)}
-                >
-                  <span>{faq.question}</span>
-                  <span className="faq-toggle-icon">
-                    {expandedId === faq._id ? "−" : "+"}
-                  </span>
-                </button>
-                {expandedId === faq._id && (
-                  <div className="faq-answer">{faq.answer}</div>
-                )}
-              </div>
-            ))}
+            {faqs.map((faq) => {
+              const isOpen = expandedId === faq._id;
+              return (
+                <div key={faq._id} className={`faq-item ${isOpen ? "open" : ""}`}>
+                  <button
+                    type="button"
+                    className="faq-question"
+                    onClick={() => toggleExpand(faq._id)}
+                    aria-expanded={isOpen}
+                  >
+                    <div className="faq-question-left">
+                      <span className="faq-category-tag">{faq.category}</span>
+                      <span className="faq-question-text">{faq.question}</span>
+                    </div>
+                    <span className={`faq-toggle-chevron ${isOpen ? "open" : ""}`}>
+                      ▼
+                    </span>
+                  </button>
+
+                  {isOpen && (
+                    <div className="faq-answer">
+                      <div className="faq-answer-content">{faq.answer}</div>
+                      <div className="faq-answer-footer">
+                        <span className="official-source-badge">
+                          ✓ Verified by MAIT Academic Cell
+                        </span>
+                        <Link to="/chat" className="faq-clarify-link">
+                          Need further clarification? Ask AI →
+                        </Link>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </div>
         )}
-      </div>
+      </main>
     </div>
   );
 }
 
 export default HelpCenter;
+
