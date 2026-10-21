@@ -76,25 +76,10 @@ function StudentChat() {
                 {msg.text}
                 {msg.escalated && (
                   <div className="escalated-tag">
-                    Not fully confident — a staff member may follow up.
-                    {msg.ticketCode ? (
-                      <>
-                        {" "}
-                        <Link
-                          to={`/track?code=${msg.ticketCode}`}
-                          className="inline-link"
-                        >
-                          Track ticket {msg.ticketCode}
-                        </Link>
-                      </>
-                    ) : (
-                      <>
-                        {" "}
-                        <Link to="/submit" className="inline-link">
-                          Raise a request instead
-                        </Link>
-                      </>
-                    )}
+                    I couldn't find this in my knowledge base.{" "}
+                    <Link to="/submit" className="inline-link">
+                      Raise a request
+                    </Link>
                   </div>
                 )}
               </div>

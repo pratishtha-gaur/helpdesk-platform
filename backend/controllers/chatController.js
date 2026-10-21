@@ -2,9 +2,6 @@ import ai, { MODEL_NAME } from "../config/gemini.js";
 import ChatLog from "../models/ChatLog.js";
 import { findBestFaqMatch } from "../utils/searchFaq.js";
 import { findRelevantChunks } from "../utils/searchKnowledge.js";
-import { createTicketInternal } from "./ticketController.js";
-
-const ESCALATION_THRESHOLD = 0.15;
 
 export async function handleChatMessage(req, res) {
   try {
@@ -14,9 +11,9 @@ export async function handleChatMessage(req, res) {
       return res.status(400).json({ error: "Message text is required." });
     }
 
-    console.time("total"); // CHANGED: timing, remove later
+    console.time("total"); // timing, remove later
 
-    // CHANGED: run both searches at the same time, and use only 3 chunks
+    // Run both searches at the same time, and use only 3 chunks
     const [{ faq, score }, relevantChunks] = await Promise.all([
       findBestFaqMatch(message),
       findRelevantChunks(message, 3),
@@ -31,7 +28,7 @@ export async function handleChatMessage(req, res) {
       const tag = [c.section, c.branch, c.semester ? `Sem ${c.semester}` : null]
         .filter(Boolean)
         .join(" - ");
-      // CHANGED: trim each chunk so the prompt stays short
+      // Trim each chunk so the prompt stays short
       contextParts.push(
         `[${tag}] (source: ${c.sourceUrl}):\n${c.text.slice(0, 800)}`,
       );
@@ -40,9 +37,6 @@ export async function handleChatMessage(req, res) {
     const contextText = contextParts.length
       ? contextParts.join("\n\n")
       : "No matching information was found in the knowledge base for this query.";
-
-    const hasGoodChunkMatch = relevantChunks.length > 0;
-    const shouldEscalate = score < ESCALATION_THRESHOLD && !hasGoodChunkMatch;
 
     const prompt = `
 You are a helpful, polite student helpdesk assistant for Maharaja Agrasen
@@ -53,11 +47,16 @@ Rules you MUST follow:
    its ISO code, e.g. "en" for English, "hi" for Hindi, "pa" for Punjabi).
 2. Reply to the student in THAT SAME language and script.
 3. Base your answer ONLY on the context given below (verified FAQ +
-   information scraped from the MAIT website). If nothing relevant is
-   provided, politely say you don't have that information yet and that
-   you're forwarding this to the college staff. Do NOT make up facts,
+   information scraped from the MAIT website). Do NOT make up facts,
    numbers, dates, or fee amounts.
-4. Keep the answer short, clear, and friendly (2-4 sentences).
+4. If the context does NOT contain the answer, set "answered" to false.
+   In your reply, politely say you don't have that information, and tell
+   the student they can raise a request using the "Raise a request"
+   option given below the chat, so college staff can help them.
+   NEVER say that a request or ticket has been created or forwarded —
+   the student must raise it themselves.
+5. If the context does contain the answer, set "answered" to true.
+6. Keep the answer short, clear, and friendly (2-4 sentences).
 
 Context:
 ${contextText}
@@ -65,10 +64,10 @@ ${contextText}
 Student's message: "${message}"
 
 Respond ONLY with valid JSON in exactly this format:
-{"language": "en", "answer": "your reply here"}
+{"language": "en", "answered": true, "answer": "your reply here"}
 `;
 
-    // CHANGED: ask for JSON directly, cap the length, reduce "thinking"
+    // Ask for JSON directly, cap the length, reduce "thinking"
     const result = await ai.models.generateContent({
       model: MODEL_NAME,
       contents: prompt,
@@ -91,10 +90,15 @@ Respond ONLY with valid JSON in exactly this format:
       console.error("Failed to parse Gemini response:", rawText);
       parsed = {
         language: "en",
+        answered: false,
         answer:
-          "Sorry, I had trouble understanding that. Could you please rephrase your question?",
+          'Sorry, I had trouble understanding that. Could you please rephrase your question? If you still need help, you can raise a request using the "Raise a request" option given below.',
       };
     }
+
+    // The bot could not answer -> student should raise a request manually.
+    // (No ticket is created automatically.)
+    const couldNotAnswer = parsed.answered === false;
 
     const logData = {
       sessionId: sessionId || "anonymous",
@@ -103,43 +107,20 @@ Respond ONLY with valid JSON in exactly this format:
       matchedFaq: faq ? faq._id : null,
       botResponse: parsed.answer,
       confidenceScore: score,
-      wasEscalated: shouldEscalate,
+      wasEscalated: couldNotAnswer, // counts as "unanswered" in analytics
     };
 
-    let ticketCode = null;
-
-    if (shouldEscalate) {
-      // Ticket needs the chat log's ID, so we must wait here
-      const chatLog = await ChatLog.create(logData);
-      const ticket = await createTicketInternal({
-        category: faq ? faq.category : "General",
-        subject: message.slice(0, 80),
-        firstMessage: message,
-        sessionId: sessionId || "anonymous",
-        sourceChatLog: chatLog._id,
-        sender: "student",
-      });
-      ticket.thread.push({ sender: "bot", text: parsed.answer });
-      await ticket.save();
-      ticketCode = ticket.ticketCode;
-    } else {
-      // CHANGED: save the log in the background, don't make the student wait
-      ChatLog.create(logData).catch((err) =>
-        console.error("ChatLog save failed:", err.message),
-      );
-    }
-
-    const finalReply = ticketCode
-      ? `${parsed.answer}\n\nI've created ticket ${ticketCode} for you — you can track its status anytime on the "Track My Request" page.`
-      : parsed.answer;
+    // Save the log in the background, don't make the student wait
+    ChatLog.create(logData).catch((err) =>
+      console.error("ChatLog save failed:", err.message),
+    );
 
     console.timeEnd("total");
 
     return res.status(200).json({
-      reply: finalReply,
+      reply: parsed.answer,
       language: parsed.language,
-      escalated: shouldEscalate,
-      ticketCode,
+      escalated: couldNotAnswer,
     });
   } catch (error) {
     console.error("Chat controller error:", error.message);
