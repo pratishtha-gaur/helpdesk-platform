@@ -42,8 +42,8 @@ function AdminDashboard() {
     navigate("/staff-login", { replace: true });
   }
 
-  async function loadDashboardData() {
-    setLoading(true);
+  async function loadDashboardData(showLoading = false) {
+    if (showLoading) setLoading(true);
     try {
       const headers = authHeaders();
       const [summaryRes, ticketsRes] = await Promise.all([
@@ -60,7 +60,7 @@ function AdminDashboard() {
       const summaryData = await summaryRes.json();
       const ticketsData = await ticketsRes.json();
       setSummary(summaryData);
-      setTickets(ticketsData.tickets);
+      setTickets(ticketsData.tickets || []);
     } catch (error) {
       console.error("Failed to load dashboard data:", error);
     } finally {
@@ -69,7 +69,7 @@ function AdminDashboard() {
   }
 
   useEffect(() => {
-    loadDashboardData();
+    loadDashboardData(true);
   }, []);
 
   // Called when staff changes a ticket's status dropdown and/or writes a reply.
@@ -86,7 +86,7 @@ function AdminDashboard() {
 
       // Clear that ticket's draft reply box and refresh the list.
       setReplyDrafts((prev) => ({ ...prev, [ticketId]: "" }));
-      loadDashboardData();
+      await loadDashboardData(false);
     } catch (error) {
       console.error("Failed to update ticket:", error);
     }
@@ -190,13 +190,17 @@ function AdminDashboard() {
         {/* ---- TOP QUESTIONS ---- */}
         <div className="top-questions-box">
           <h3>Most Frequently Asked</h3>
-          <ol>
-            {summary.topQuestions.map((q) => (
-              <li key={q._id}>
-                {q._id} <span className="count-badge">{q.count}</span>
-              </li>
-            ))}
-          </ol>
+          {summary.topQuestions && summary.topQuestions.length > 0 ? (
+            <ol>
+              {summary.topQuestions.map((q) => (
+                <li key={q._id}>
+                  {q._id} <span className="count-badge">{q.count}</span>
+                </li>
+              ))}
+            </ol>
+          ) : (
+            <p className="empty-state">No question trends recorded yet.</p>
+          )}
         </div>
 
         {/* ---- TICKET / CASE MANAGEMENT ---- */}
@@ -221,7 +225,7 @@ function AdminDashboard() {
                   <p className="ticket-subject">{t.subject}</p>
 
                   <div className="ticket-thread-mini">
-                    {t.thread.map((msg, i) => (
+                    {(t.thread || []).map((msg, i) => (
                       <p key={i} className={`thread-line ${msg.sender}`}>
                         <strong>{msg.sender}:</strong> {msg.text}
                       </p>

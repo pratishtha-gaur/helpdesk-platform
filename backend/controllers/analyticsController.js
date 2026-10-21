@@ -1,4 +1,5 @@
 import ChatLog from "../models/ChatLog.js";
+import Ticket from "../models/Ticket.js";
 
 /**
  * GET /api/analytics/summary
@@ -7,13 +8,13 @@ import ChatLog from "../models/ChatLog.js";
 export async function getSummary(req, res) {
   try {
     // ---- Simple counts ----
-    // countDocuments({}) = count everything.
-    // countDocuments({ wasEscalated: true }) = count only matching documents.
+    // countDocuments({}) = count all conversations logged with the assistant.
+    // escalatedCount = total support tickets raised to staff.
+    // unresolvedCount = count of tickets that are still open or in progress.
     const totalChats = await ChatLog.countDocuments({});
-    const escalatedCount = await ChatLog.countDocuments({ wasEscalated: true });
-    const unresolvedCount = await ChatLog.countDocuments({
-      wasEscalated: true,
-      resolved: false,
+    const escalatedCount = await Ticket.countDocuments({});
+    const unresolvedCount = await Ticket.countDocuments({
+      status: { $ne: "Resolved" },
     });
 
     // ---- Language breakdown (aggregation pipeline) ----
@@ -135,6 +136,12 @@ export async function resolveEscalation(req, res) {
     if (!updated) {
       return res.status(404).json({ error: "Chat log not found." });
     }
+
+    // Keep linked Ticket in sync if one exists
+    await Ticket.updateMany(
+      { sourceChatLog: id },
+      { status: "Resolved" }
+    );
 
     return res.status(200).json({ message: "Marked as resolved.", chatLog: updated });
   } catch (error) {

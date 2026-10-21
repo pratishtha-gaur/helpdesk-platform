@@ -1,4 +1,5 @@
 import Ticket from "../models/Ticket.js";
+import ChatLog from "../models/ChatLog.js";
 import { getNextSequence } from "../models/Counter.js";
 
 /**
@@ -114,7 +115,16 @@ export async function updateTicketStatus(req, res) {
       return res.status(404).json({ error: "Ticket not found." });
     }
 
-    if (status) ticket.status = status;
+    if (status) {
+      ticket.status = status;
+      if (ticket.sourceChatLog) {
+        const updateData = { resolved: status === "Resolved" };
+        if (staffReply && staffReply.trim() !== "") {
+          updateData.staffNote = staffReply.trim();
+        }
+        await ChatLog.findByIdAndUpdate(ticket.sourceChatLog, updateData);
+      }
+    }
 
     // If staff wrote a reply, append it to the thread array.
     if (staffReply && staffReply.trim() !== "") {
