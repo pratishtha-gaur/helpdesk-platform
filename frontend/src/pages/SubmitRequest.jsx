@@ -18,6 +18,7 @@ function SubmitRequest() {
   const [description, setDescription] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
+  const [email, setEmail] = useState("");
 
   const navigate = useNavigate();
 
@@ -28,6 +29,10 @@ function SubmitRequest() {
       setError("Please fill in both the subject and detailed description.");
       return;
     }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
+      setError("Please enter a valid email address to receive updates.");
+      return;
+    }
 
     setSubmitting(true);
     setError("");
@@ -36,7 +41,7 @@ function SubmitRequest() {
       const response = await fetch(`${BACKEND_URL}/api/tickets`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ category, subject, description }),
+        body: JSON.stringify({ category, subject, description, email }),
       });
 
       if (!response.ok) throw new Error("Server error");
@@ -44,7 +49,9 @@ function SubmitRequest() {
       const data = await response.json();
       navigate(`/track?code=${data.ticket.ticketCode}`);
     } catch {
-      setError("Something went wrong submitting your request. Please try again.");
+      setError(
+        "Something went wrong submitting your request. Please try again.",
+      );
     } finally {
       setSubmitting(false);
     }
@@ -57,10 +64,13 @@ function SubmitRequest() {
       <main className="form-shell-wide">
         <div className="portal-intro">
           <div className="section-badge-wrapper center-badge">
-            <span className="section-badge">STUDENT GRIEVANCE &amp; SUPPORT</span>
+            <span className="section-badge">
+              STUDENT GRIEVANCE &amp; SUPPORT
+            </span>
             <h1>Raise an Official Request</h1>
             <p>
-              Submit your inquiry or issue directly to the concerned MAIT departmental staff.
+              Submit your inquiry or issue directly to the concerned MAIT
+              departmental staff.
             </p>
           </div>
         </div>
@@ -70,8 +80,28 @@ function SubmitRequest() {
           <div className="form-main-card">
             <form onSubmit={handleSubmit} className="submit-form-modern">
               <div className="form-field-group">
+                <label htmlFor="ticket-email">
+                  <span className="field-label-text">Your Email Address</span>
+                  <span className="field-required">*</span>
+                </label>
+                <input
+                  id="ticket-email"
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="e.g., yourname@gmail.com"
+                  autoComplete="email"
+                />
+                <span className="field-hint">
+                  We will email your ticket ID now, and the answer once it is
+                  resolved
+                </span>
+              </div>
+              <div className="form-field-group">
                 <label htmlFor="ticket-category">
-                  <span className="field-label-text">Category / Department</span>
+                  <span className="field-label-text">
+                    Category / Department
+                  </span>
                   <span className="field-required">*</span>
                 </label>
                 <div className="select-wrapper">
@@ -92,7 +122,9 @@ function SubmitRequest() {
 
               <div className="form-field-group">
                 <label htmlFor="ticket-subject">
-                  <span className="field-label-text">Subject / Brief Summary</span>
+                  <span className="field-label-text">
+                    Subject / Brief Summary
+                  </span>
                   <span className="field-required">*</span>
                 </label>
                 <input
@@ -103,7 +135,9 @@ function SubmitRequest() {
                   placeholder="e.g., 'Hostel room cooler permission' or 'Fee challan verification'"
                   maxLength={120}
                 />
-                <span className="field-hint">A concise title summarizing your request</span>
+                <span className="field-hint">
+                  A concise title summarizing your request
+                </span>
               </div>
 
               <div className="form-field-group">
@@ -119,7 +153,8 @@ function SubmitRequest() {
                   rows={6}
                 />
                 <span className="field-hint">
-                  Tip: Include your Enrollment No. &amp; contact info for faster resolution
+                  Tip: Include your Enrollment No. &amp; contact info for faster
+                  resolution
                 </span>
               </div>
 
@@ -130,7 +165,11 @@ function SubmitRequest() {
                 </div>
               )}
 
-              <button type="submit" className="submit-action-btn" disabled={submitting}>
+              <button
+                type="submit"
+                className="submit-action-btn"
+                disabled={submitting}
+              >
                 {submitting ? (
                   <span className="btn-loading-state">
                     <span className="btn-spinner" />
@@ -156,13 +195,17 @@ function SubmitRequest() {
 
               <ul className="guidance-list">
                 <li>
-                  <strong>Enrollment Number:</strong> Mention your 11-digit GGSIPU roll number in the description.
+                  <strong>Enrollment Number:</strong> Mention your 11-digit
+                  GGSIPU roll number in the description.
                 </li>
                 <li>
-                  <strong>Response Turnaround:</strong> Requests are typically reviewed within 24–48 working hours.
+                  <strong>Response Turnaround:</strong> Requests are typically
+                  reviewed within 24–48 working hours.
                 </li>
                 <li>
-                  <strong>Instant Tracking:</strong> Upon submission, you will receive a unique ticket ID (e.g. <code>MAIT-1042</code>) to track progress.
+                  <strong>Instant Tracking:</strong> Upon submission, you will
+                  receive a unique ticket ID (e.g. <code>MAIT-1042</code>) to
+                  track progress.
                 </li>
               </ul>
 
@@ -187,4 +230,3 @@ function SubmitRequest() {
 }
 
 export default SubmitRequest;
-

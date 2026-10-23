@@ -11,7 +11,7 @@ const messageSchema = new mongoose.Schema(
     },
     text: { type: String, required: true },
   },
-  { timestamps: true } // each message gets its own timestamp
+  { timestamps: true }, // each message gets its own timestamp
 );
 
 const ticketSchema = new mongoose.Schema(
@@ -26,13 +26,28 @@ const ticketSchema = new mongoose.Schema(
 
     category: {
       type: String,
-      enum: ["Admissions", "Scholarships", "Examinations", "Fees", "Hostel", "General"],
+      enum: [
+        "Admissions",
+        "Scholarships",
+        "Examinations",
+        "Fees",
+        "Hostel",
+        "General",
+      ],
       default: "General",
     },
 
     subject: {
       type: String,
       required: true,
+    },
+
+    // Student's email, used for ticket notifications. Never sent to the public tracking page.
+    email: {
+      type: String,
+      trim: true,
+      lowercase: true,
+      default: null,
     },
 
     // The FULL lifecycle of a real support case — this is what a plain
@@ -70,7 +85,7 @@ const ticketSchema = new mongoose.Schema(
       default: "Unassigned",
     },
   },
-  { timestamps: true }
+  { timestamps: true },
 );
 
 const Ticket = mongoose.model("Ticket", ticketSchema);

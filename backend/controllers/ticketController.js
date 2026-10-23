@@ -1,29 +1,30 @@
 import Ticket from "../models/Ticket.js";
 import ChatLog from "../models/ChatLog.js";
 import { getNextSequence } from "../models/Counter.js";
+import {
+  sendTicketCreatedEmail,
+  sendTicketResolvedEmail,
+} from "../utils/mailer.js";
 
-/**
- * Internal helper (NOT an HTTP route) — used by other parts of our code
- * (like the chat controller) to create a ticket programmatically.
- * We export this separately so both the chatbot AND a manual "raise a
- * request" form can create tickets through the exact same logic.
- */
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
 export async function createTicketInternal({
   category,
   subject,
   firstMessage,
+  email = null,
   sessionId = null,
   sourceChatLog = null,
   sender = "student",
 }) {
   const nextNumber = await getNextSequence("ticket");
-  // padStart(4, "0") turns 7 into "0007" — keeps ticket codes tidy and consistent.
   const ticketCode = `MAIT-${String(nextNumber).padStart(4, "0")}`;
 
   const ticket = await Ticket.create({
     ticketCode,
     category,
     subject,
+    email,
     sessionId,
     sourceChatLog,
     thread: [{ sender, text: firstMessage }],
@@ -34,25 +35,41 @@ export async function createTicketInternal({
 
 /**
  * POST /api/tickets
- * Lets a student directly raise a request through a form on the
- * self-service portal — not just via an escalated chat.
+ * Student raises a request. Email is mandatory so we can notify them.
  */
 export async function createTicket(req, res) {
   try {
-    const { category, subject, description } = req.body;
+    const { category, subject, description, email } = req.body;
 
     if (!subject || !description) {
-      return res.status(400).json({ error: "Subject and description are required." });
+      return res
+        .status(400)
+        .json({ error: "Subject and description are required." });
+    }
+    if (typeof email !== "string" || !EMAIL_REGEX.test(email.trim())) {
+      return res
+        .status(400)
+        .json({ error: "A valid email address is required." });
     }
 
     const ticket = await createTicketInternal({
       category: category || "General",
       subject,
       firstMessage: description,
+      email: email.trim(),
       sender: "student",
     });
 
-    return res.status(201).json({ ticket });
+    // Fire-and-forget: the student doesn't wait for the mail server,
+    // and a mail failure never fails the ticket.
+    sendTicketCreatedEmail(ticket).catch((err) =>
+      console.error("Ticket-created email failed:", err.message),
+    );
+
+    // Don't echo the email back in the response.
+    const safeTicket = ticket.toObject();
+    delete safeTicket.email;
+    return res.status(201).json({ ticket: safeTicket });
   } catch (error) {
     console.error("Create ticket error:", error.message);
     return res.status(500).json({ error: "Failed to create ticket." });
@@ -60,16 +77,15 @@ export async function createTicket(req, res) {
 }
 
 /**
- * GET /api/tickets/:ticketCode
- * Public tracking — a student enters their ticket code (e.g. "MAIT-0007")
- * and sees its current status and full conversation thread.
- * No login required, since we haven't built authentication yet — the
- * ticket code itself acts as the "key" to view it.
+ * GET /api/tickets/:ticketCode  (public)
+ * "-email" keeps the student's email private.
  */
 export async function getTicketByCode(req, res) {
   try {
     const { ticketCode } = req.params;
-    const ticket = await Ticket.findOne({ ticketCode: ticketCode.toUpperCase() });
+    const ticket = await Ticket.findOne({
+      ticketCode: ticketCode.toUpperCase(),
+    }).select("-email");
 
     if (!ticket) {
       return res.status(404).json({ error: "No ticket found with that code." });
@@ -82,17 +98,14 @@ export async function getTicketByCode(req, res) {
   }
 }
 
-/**
- * GET /api/tickets
- * Staff view — lists all tickets, optionally filtered by status,
- * most recent first.
- */
 export async function listTickets(req, res) {
   try {
     const { status } = req.query;
     const filter = status ? { status } : {};
 
-    const tickets = await Ticket.find(filter).sort({ createdAt: -1 }).limit(200);
+    const tickets = await Ticket.find(filter)
+      .sort({ createdAt: -1 })
+      .limit(200);
     return res.status(200).json({ tickets });
   } catch (error) {
     console.error("List tickets error:", error.message);
@@ -101,9 +114,8 @@ export async function listTickets(req, res) {
 }
 
 /**
- * PATCH /api/tickets/:id/status
- * Staff updates a ticket's status and optionally adds a reply message
- * to the thread — this is the core "human-in-the-loop" workflow action.
+ * PATCH /api/tickets/:id/status  (staff only)
+ * Updates status, appends staff reply, and emails the student on resolution.
  */
 export async function updateTicketStatus(req, res) {
   try {
@@ -115,23 +127,39 @@ export async function updateTicketStatus(req, res) {
       return res.status(404).json({ error: "Ticket not found." });
     }
 
+    const wasResolved = ticket.status === "Resolved";
+    const reply = typeof staffReply === "string" ? staffReply.trim() : "";
+
     if (status) {
       ticket.status = status;
       if (ticket.sourceChatLog) {
         const updateData = { resolved: status === "Resolved" };
-        if (staffReply && staffReply.trim() !== "") {
-          updateData.staffNote = staffReply.trim();
-        }
+        if (reply) updateData.staffNote = reply;
         await ChatLog.findByIdAndUpdate(ticket.sourceChatLog, updateData);
       }
     }
 
-    // If staff wrote a reply, append it to the thread array.
-    if (staffReply && staffReply.trim() !== "") {
-      ticket.thread.push({ sender: "staff", text: staffReply.trim() });
+    if (reply) {
+      ticket.thread.push({ sender: "staff", text: reply });
     }
 
     await ticket.save();
+
+    // Email only on the moment it BECOMES resolved (no duplicate emails).
+    if (status === "Resolved" && !wasResolved && ticket.email) {
+      // Use this reply, or fall back to the latest staff message in the thread.
+      const lastStaffMsg = [...ticket.thread]
+        .reverse()
+        .find((m) => m.sender === "staff");
+      const answer =
+        reply ||
+        lastStaffMsg?.text ||
+        "Your request has been reviewed and closed by MAIT staff.";
+
+      sendTicketResolvedEmail(ticket, answer).catch((err) =>
+        console.error("Ticket-resolved email failed:", err.message),
+      );
+    }
 
     return res.status(200).json({ ticket });
   } catch (error) {
